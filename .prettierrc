@@ -1,0 +1,14 @@
+{
+    "tabWidth": 4,
+    "singleQuote": false,
+    "printWidth": 160,
+    "bracketSpacing": false,
+    "overrides": [
+        {
+            "files": ["*.md", "*.json", "*.yml"],
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
+}
