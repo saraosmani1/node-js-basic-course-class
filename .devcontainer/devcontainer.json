@@ -19,6 +19,8 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [5432],
 
+	"postCreateCommand": "apt-get update && apt-get install -y npm",
+
 	"extensions": [
         "cweijan.vscode-mysql-client2"
 	]
