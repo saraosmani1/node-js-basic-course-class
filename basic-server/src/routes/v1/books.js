@@ -1,4 +1,4 @@
-const { bookSchema,getBookOpts, getFilteredBookOpts, getBookPaginatedOpts,postBookOpts, putBookOpts, getSortedBooksOpts } = require("../../schema/v1/books");
+const { bookSchema, getBookOpts, postBookOpts, putBookOpts, getBookOneOpts } = require("../../schema/v1/books");
 
 
 let books = [
@@ -31,81 +31,114 @@ let books = [
 
 const booksRoutes = (fastify, options, done) => {
 
-    fastify.get("/books", (req, rep) => {
-        return books
-    })
-    fastify.post("/books", postBookOpts, (req, rep) => {
+    fastify.post('/books', postBookOpts, async (req, rep) => {
         const { book } = req.body;
-        const validationResult = fastify.validate(bookSchema, book);
-        if (validationResult.error) {
-          reply.status(400).send({ error: 'Invalid book data', details: validationResult.error.details });
-          return;
+        const client = await fastify.pg.connect();
+        try {
+            await client.query(
+                'INSERT INTO books (title, author, publicationYear, isbn) VALUES ($1, $2, $3, $4)',
+                [book.title, book.author, book.publicationYear, book.isbn]
+            );
+            return rep.send({ message: 'Book created successfully' });
+        } catch (err) {
+            return rep.status(500).send({ message: 'An error occurred', error: err });
+        } finally {
+            client.release();
         }
-        books.push({ ...book, id: Date.now() })
-        console.log(books);
-        return "Success"
-    })
-    fastify.put("/books/:id", putBookOpts, (req, rep) => {
+    });
+
+    fastify.put('/books/:id', putBookOpts, async (req, rep) => {
         const { book } = req.body;
-        const id = parseInt(req.params.id)
-        books = books.map(b => {
-            if (b.id === id)
-                return { ...b, ...book };
-            return b
-        })
-        console.log(books);
-        return "Success"
-    })
-    fastify.get("/books/:id", getBookOpts, (req, rep) => {
-        const id = parseInt(req.params.id)
-        const book = books.find(i => i.id === id)
-        return book
-    })
-
-    fastify.get("/books/pagination/:page", getBookPaginatedOpts, (req, rep) => {
-        const page = parseInt(req.params.page)
-        const paginatedBooks = books.slice(page * 10, page * 10 + 10)
-        return { books: paginatedBooks };
-    })
-
-    fastify.get("/books/filter", getFilteredBookOpts, (req, rep) => {
-        const { author, publicationYear } = req.query;
-        const filteredBooks = books.filter(i => {
-            if (!publicationYear && !author) {
-                return books
+        const id = parseInt(req.params.id);
+        const client = await fastify.pg.connect();
+        try {
+            const { rowCount } = await client.query(
+                'UPDATE books SET title = $1, author = $2, publicationYear = $3, isbn = $4 WHERE id = $5',
+                [book.title, book.author, book.publicationYear, book.isbn, id]
+            );
+            if (rowCount === 0) {
+                return rep.status(404).send({ message: 'Book not found' });
             }
-            else if (publicationYear) {
-                return i.author.includes(author || "") && i.publicationYear === publicationYear
+            return rep.send({ message: 'Book updated successfully' });
+        } catch (err) {
+            return rep.status(500).send({ message: 'An error occurred', error: err });
+        } finally {
+            client.release();
+        }
+    });
+    fastify.get('/books/:id', getBookOneOpts, async (req, rep) => {
+        const id = parseInt(req.params.id);
+        const client = await fastify.pg.connect();
+        try {
+            const { rows } = await client.query('SELECT * FROM books WHERE id = $1', [id]);
+            if (rows.length === 0) {
+                return rep.status(404).send({ message: 'Book not found' });
+            }
+            return rows[0];
+        } catch (err) {
+            return rep.status(500).send({ message: 'An error occurred', error: err });
+        } finally {
+            client.release();
+        }
+    });
+
+    fastify.get('/books', getBookOpts, async (request, reply) => {
+        const client = await fastify.pg.connect();
+        try {
+            const { page, author, publicationYear, order } = request.query;
+
+            let query = 'SELECT * FROM books';
+            let conditions = [];
+            let params = [];
+
+            if (author) {
+                conditions.push('author ILIKE $' + (params.length + 1));
+                params.push(`%${author}%`);
+            }
+            if (publicationYear) {
+                conditions.push('publicationYear = $' + (params.length + 1));
+                params.push(publicationYear);
+            }
+
+            if (conditions.length > 0) {
+                query += ' WHERE ' + conditions.join(' AND ');
+            }
+
+            query += ' ORDER BY publicationYear ' + (order === 'asc' ? 'ASC' : 'DESC');
+
+            if (page) {
+                const limit = 10;
+                const offset = (parseInt(page) - 1) * limit;
+                query += ` LIMIT ${limit} OFFSET ${offset}`;
             } else {
-                return i.author.includes(author)
+                query += ' LIMIT 10';
             }
 
+            const { rows } = await client.query(query, params);
+            reply.send(rows);
+        } catch (err) {
+            reply.send(err);
+        } finally {
+            client.release();
         }
-        )
-        return filteredBooks
-    })
-    fastify.get("/books/order", getSortedBooksOpts, (req, rep) => {
-        const { order } = req.query;
-      
-        const sortedBooks = books.slice(); // Copy array to avoid mutating original data
-      
-        sortedBooks.sort((a, b) => {
-          if (order === 'asc') {
-            return a.publicationYear - b.publicationYear;
-          } else {
-            return b.publicationYear - a.publicationYear;
-          }
-        });
-         console.log(sortedBooks)
-        return sortedBooks
-      });
-    fastify.delete("/books/:id", getBookOpts, (req, rep) => {
-        const id = parseInt(req.params.id)
-        books = books.filter(i => i.id !== id)
-        console.log(books);
-        return books
-    })
+    });
 
+
+    fastify.delete('/books/:id', getBookOneOpts, async (req, rep) => {
+        const id = parseInt(req.params.id);
+        const client = await fastify.pg.connect();
+        try {
+            const { rowCount } = await client.query('DELETE FROM books WHERE id = $1', [id]);
+            if (rowCount === 0) {
+                return rep.status(404).send({ message: 'Book not found' });
+            }
+            return rep.send({ message: 'Book deleted successfully' });
+        } catch (err) {
+            return rep.status(500).send({ message: 'An error occurred', error: err });
+        } finally {
+            client.release();
+        }
+    });
     done()
 }
 
