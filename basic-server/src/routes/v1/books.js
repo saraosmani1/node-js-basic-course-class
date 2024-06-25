@@ -1,5 +1,5 @@
-const { getBookOpts, getFilteredBookOpts, getBookPaginatedOpts } = require("../../schema/v1/books");
-const { getItemsOpts, postBookOpts, putBookOpts } = require("../../schema/v1/items")
+const { bookSchema,getBookOpts, getFilteredBookOpts, getBookPaginatedOpts,postBookOpts, putBookOpts, getSortedBooksOpts } = require("../../schema/v1/books");
+
 
 let books = [
     { id: 1, title: "To Kill a Mockingbird", author: "Harper Lee", isbn: "9780061120084", publicationYear: "1949" },
@@ -36,6 +36,11 @@ const booksRoutes = (fastify, options, done) => {
     })
     fastify.post("/books", postBookOpts, (req, rep) => {
         const { book } = req.body;
+        const validationResult = fastify.validate(bookSchema, book);
+        if (validationResult.error) {
+          reply.status(400).send({ error: 'Invalid book data', details: validationResult.error.details });
+          return;
+        }
         books.push({ ...book, id: Date.now() })
         console.log(books);
         return "Success"
@@ -79,7 +84,21 @@ const booksRoutes = (fastify, options, done) => {
         )
         return filteredBooks
     })
-
+    fastify.get("/books/order", getSortedBooksOpts, (req, rep) => {
+        const { order } = req.query;
+      
+        const sortedBooks = books.slice(); // Copy array to avoid mutating original data
+      
+        sortedBooks.sort((a, b) => {
+          if (order === 'asc') {
+            return a.publicationYear - b.publicationYear;
+          } else {
+            return b.publicationYear - a.publicationYear;
+          }
+        });
+         console.log(sortedBooks)
+        return sortedBooks
+      });
     fastify.delete("/books/:id", getBookOpts, (req, rep) => {
         const id = parseInt(req.params.id)
         books = books.filter(i => i.id !== id)
