@@ -7,12 +7,16 @@ const jwtRoutes = (fastify, options, done) => {
         const { user } = req.body;
         const client = await fastify.pg.connect();
         try {
+            let actions = ['read']
+            if (user.role === 'admin') {
+                actions.push('delete')
+                actions.push('write')
+            }
             await client.query(
-                'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
-                [user.username, user.password, user.role]
+                'INSERT INTO users (username, password, role, actions) VALUES ($1, $2, $3, $4)',
+                [user.username, user.password, user.role, actions]
             );
-
-            const token = fastify.jwt.sign({ username: user.username, role: user.role })
+            const token = fastify.jwt.sign({ username: user.username, role: user.role, actions })
             return rep.send({ token });
         } catch (err) {
             return rep.status(500).send({ message: 'An error occurred', error: err });
@@ -25,11 +29,12 @@ const jwtRoutes = (fastify, options, done) => {
         const { user } = req.body;
         const client = await fastify.pg.connect();
         try {
-            const {rows} = await client.query(
-                'SELECT username, role FROM users WHERE username = $1 AND password = $2',
+            const { rows } = await client.query(
+                'SELECT username, role, actions FROM users WHERE username = $1 AND password = $2',
                 [user.username, user.password]
             );
-            const token = fastify.jwt.sign({ username:rows[0].username, role:rows[0].role })
+            console.log(rows)
+            const token = fastify.jwt.sign({ username: rows[0].username, actions: rows[0].actions, role: rows[0].role })
             return rep.send({ token });
         } catch (err) {
             return rep.status(500).send({ message: 'An error occurred', error: err });
@@ -42,9 +47,10 @@ const jwtRoutes = (fastify, options, done) => {
         const client = await fastify.pg.connect();
         try {
             const decodedToken = fastify.jwt.verify(token);
-            return rep.send({ role:decodedToken.role });
+            console.log(decodedToken)
+            return rep.send({ actions: decodedToken.actions });
         } catch (err) {
-                return rep.status(401).send({ message: 'Unauthorised' });
+            return rep.status(401).send({ message: 'Unauthorised' });
         } finally {
             client.release();
         }

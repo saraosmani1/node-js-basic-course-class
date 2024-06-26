@@ -40,9 +40,9 @@ const signUpOpts = {
                     type: 'object',
                     required: ['username', 'role', "password"],
                     properties: {
-                        username: { type: 'string' },
-                        role: { type: 'string' },
-                        password: { type: 'string' },
+                        username: { type: 'string', minLength: 3, maxLength: 30 },
+                        password: { type: 'string', minLength: 8, maxLength: 30 },
+                        role: { type: 'string', enum: ['normal', 'admin'] },
                     }
                 }
             }
@@ -78,7 +78,10 @@ const tokenOpts = {
             200: {
                 type: 'object',
                 properties: {
-                    role: { type: 'string' }
+                    actions: {
+                        type: 'array',
+                        items: { type: 'string' }
+                    }
                 }
             },
             401: {

@@ -1,5 +1,6 @@
 const getBookOpts = {
     schema: {
+        headers: { type: 'object', properties: { 'token': { type: 'string' } }},
         querystring: {
             type: 'object',
             properties: {
@@ -35,6 +36,7 @@ const getBookOpts = {
 
 const getBookOneOpts = {
     schema: {
+        headers: { type: 'object', properties: { 'token': { type: 'string' } }},
         params: {
             id: {
                 type: "string"
@@ -74,6 +76,7 @@ const bookSchema = {
 
 const postBookOpts = {
     schema: {
+        headers: { type: 'object', properties: { 'token': { type: 'string' } }},
         tags: ['books'],
         body: {
             type: 'object',
@@ -100,6 +103,7 @@ const postBookOpts = {
 }
 const putBookOpts = {
     schema: {
+        headers: { type: 'object', properties: { 'token': { type: 'string' } }},
         tags: ['books'],
         body: {
             type: 'object',
