@@ -64,11 +64,37 @@ const signUpOpts = {
     }
 }
 
-
+const tokenOpts = {
+    schema: {
+        tags: ['token'],
+        body: {
+            type: 'object',
+            required: ['token'],
+            properties: {
+                token: { type: 'string' },
+            }
+        },
+        response: {
+            200: {
+                type: 'object',
+                properties: {
+                    role: { type: 'string' }
+                }
+            },
+            401: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string' }
+                }
+            }
+        }
+    }
+}
 
 
 
 module.exports = {
     signUpOpts,
     signInOpts,
+    tokenOpts
 };
